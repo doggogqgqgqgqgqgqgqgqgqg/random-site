@@ -1,0 +1,87 @@
+var $, fetchJsonp;
+
+$.get('https://cors-anywhere.herokuapp.com/discordapp.com/api/guilds/482313049043107844/widget.json', (res) => {
+  $('#discord-online').html(res['presence_count']);
+});
+
+const updateVolume = () => {
+  $('#stream')[0].volume = $('#volume-slider').val();
+};
+
+const togglePlay = () => {
+  const stream = $('#stream');
+  const button = $('#play-button');
+  if (stream[0].paused) {
+    button.html('<i class="fa fa-fw fa-spin fa-spinner-third"></i>Loading');
+    updateVolume();
+    stream.attr('src', 'https://simulation.stream/radio/8000/radio.mp3');
+    stream[0].play()
+    .then(() => {
+      button.html('<i class="fa fa-fw fa-pause"></i>Pause');
+    })
+    .catch(() => {
+      button.attr('<i class="fa fa-fw fa-play"></i>Play');
+    });
+  } else {
+    stream[0].pause();
+    stream.attr('src', '');
+    button.html('<i class="fa fa-fw fa-play"></i>Play');
+  };
+};
+
+const updateStats = () => {
+  $.get(`https://simulation.stream/api/nowplaying/1`, (res) => {
+    const {
+        listeners: {
+            unique: listeners
+        },
+        live: {
+            is_live: live,
+            streamer_name: dj
+        },
+        now_playing: np,
+        now_playing: {
+            song
+        },
+        song_history: history
+    } = res;
+    fetchJsonp('///api.deezer.com/search/track/autocomplete?limit=1&q='+np.song.text+'&output=jsonp')
+    .then((res) => res.json())
+    .then((res) => {
+      /*
+        Artist: res.data[0].artist.picture
+        Album Art: res.data[0].album.cover
+      */
+      if (res.data[0]) {
+        $('.song-art').attr('src', res.data[0].album.cover);
+      } else {
+        $('.song-art').attr('src', song.art.replace(/(https?:\/\/)?panel.highlowradio.co.uk\/img\/djs\/default\.png/gi, `https://media.discordapp.net/attachments/692042269531963467/694246816266453042/unknown.png?size=256`));
+      };
+    })
+    .catch((err) => {
+      console.error(`Error whilst fetching from Deezer for ${np.song.text}:`, err);
+      $('.song-art').attr('src', song.art.replace(/(https?:\/\/)?panel.highlowradio.co.uk\/img\/djs\/default\.png/gi, `https://media.discordapp.net/attachments/692042269531963467/694246816266453042/unknown.png?size=256`));
+    });
+    $('.song-title').text(song.title.replace(/(\(|ft|feat|with|lyric|\+).*/gi, ''));
+    $('.song-artist').text(song.artist.replace(/(\(|-|with|ft|feat).*/gi, ''));
+    $('.dj-name').text(live ? dj : 'Auto DJ');
+    $('.listeners').text(`${listeners} Listener${listeners == 1 ? '' : 's'}`);
+    $('.listener-count').text(listeners);
+  })
+  .fail((err) => {
+    console.error(`Error whilst fetching song metadata:`, err);
+    $('.song-art').attr('src', `https://media.discordapp.net/attachments/692042269531963467/694246816266453042/unknown.png?size=256`);
+    $('.song-title').text('Stream Offline');
+    $('.song-artist').text('This will automatically update when everything\'s back up');
+    $('.dj-listeners').text('An error occurred');
+  });
+};
+
+updateStats();
+setInterval(updateStats, 5000);
+togglePlay();
+
+$('#volume-slider').mouseup(updateVolume);
+$('#volume-slider').mousedown(updateVolume);
+$('#volume-slider').mousemove(updateVolume);
+$('#volume-slider').on('input', updateVolume);
